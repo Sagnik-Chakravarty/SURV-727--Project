@@ -1,0 +1,134 @@
+---
+title: "EV Sentiment Analysis SURV 627"
+author: "Sagnik Chakravarty and Namit Shrivastava"
+subtitle: "University of Maryland, College Park"
+format: 
+  pdf:
+    latex-engine: xelatex
+toc: True
+lot: TRUE
+lof: TRUE
+editor: visual
+---
+
+\newpage
+
+The initial task is to gather all the possible sources of data from the internet regarding EV
+
+# Reddit
+
+```{r}
+# install.packages("RedditExtractoR")
+# install.packages("tidytext")
+```
+
+```{r warning=FALSE, message=FALSE, include=FALSE}
+library(RedditExtractoR)
+library(tidytext)
+library(dplyr)
+library(pander)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(topicmodels)
+library(stringr)
+library(quanteda)
+library(kableExtra)
+```
+
+## Collecting Reddit Data
+
+```{r}
+ev_reddit <- find_subreddits("Electric Vehicle")
+ev_df_reddit <- data.frame(ev_reddit)
+ev_df_reddit_clean <- ev_df_reddit %>%
+  select(subreddit, 
+         title, 
+         description, 
+         subscribers, 
+         date_utc)
+
+ev_df_reddit_clean$date_utc <- as.Date(ev_df_reddit_clean$date_utc)
+rownames(ev_df_reddit_clean) <- 1:nrow(ev_df_reddit_clean)
+str(head(ev_df_reddit_clean, 1))
+pander(dim(ev_df_reddit))
+pander(dim(ev_df_reddit_clean))
+```
+
+```{r fig.cap="Subscriber count by Subreddits", fig.width= 5}
+ev_df_reddit_clean %>% ggplot(aes(x = subreddit, y = subscribers))+
+  geom_bar(stat = 'identity',
+           color = 'black',
+           fill = 'red')+
+  theme(axis.text.x = element_text(angle = 90,
+                                   vjust = 0,
+                                   hjust = 1,
+                                   size = 2))+
+  scale_y_continuous(
+    breaks = pretty_breaks(n=5))
+
+```
+
+Now as we can see there are 138 subreddits were we were able to find the keyword = 'Electric Vehicle'. Now working with so many subreddits is not feasible hence we would be narrowing it down to top 5 subreddits. First we would exclude the subreddit based on there descriptions then we would select the top 5 sub reddits
+
+```{r message=FALSE}
+desc_clean <- function(x){
+  tk <- tibble(line = 1, text = x)
+  tk <- tk %>% 
+    unnest_tokens(word, text) %>% 
+    anti_join(stop_words)
+  return(tolower(str_c(tk$word, collapse = ' ')))
+}
+
+ev_df_reddit_clean <- ev_df_reddit_clean %>%
+  rowwise() %>%
+  mutate(cleaned_description = desc_clean(description)) %>%
+  select(-description) %>%
+  ungroup()
+```
+
+```{r}
+check_ev <- function(x){
+  keywords <- c('electric car',
+                'electric vehicle',
+                'ev',
+                'motor',
+                'car',
+                'battery',
+                'autonomous',
+                'tesla'
+                )
+  pattern <- paste0("\\b(", paste(keywords, collapse = "|"), ")\\b")
+  any(str_detect(x, pattern = pattern))
+}
+
+ev_df_reddit_clean <- ev_df_reddit_clean %>% 
+  rowwise()  %>%
+  mutate(ev_related = if_else(check_ev(cleaned_description), TRUE, FALSE)) %>%
+  ungroup()
+```
+
+```{r fig.cap= 'Subreddit to be used for the study'}
+reddit_df <- ev_df_reddit_clean %>%
+  filter(ev_related == TRUE) %>%
+  arrange(desc(subscribers))  %>% 
+  head(n=5)
+reddit_df[c(-5,-6)] %>%
+  pander(caption = "Subreddits Related to EV")
+
+
+reddit_df %>% ggplot(aes(x = subscribers,
+                         y = subreddit))+
+  geom_bar(stat = 'identity',
+           fill = 'black')+
+  theme_classic()
+```
+
+so the subreddits we would be looking at are
+
+r/teslamotors, r/fuckcars, r/Rivian, r/TeslaModel3, r/electricvehicles
+
+```{r}
+write.csv(reddit_df, 'workable_reddit_df.csv')
+```
