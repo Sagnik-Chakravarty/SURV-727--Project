@@ -21,7 +21,8 @@ keywords <- c('BEV',
               'gas',
               'sustainability',
               'sustainable',
-              'pollution')
+              'pollution',
+              'autonomous ')
 
 reddit_url <- function(x, keyword = keywords){
   ls <- list()
