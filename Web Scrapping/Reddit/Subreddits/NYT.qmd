@@ -1,0 +1,69 @@
+```{r}
+library(rtimes)
+library(jsonlite)
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(wordcloud)
+library(textdata)
+library(scales)
+```
+```{r}
+Sys.setenv(NYTIMES_KEY = "WitNU2gMjn4URLzQTRgOxjVN0kWXZCAK")
+nyt <- rtimes::nyt_apikey()
+
+keywords <- c('electric car', 'electric vehicle', 'ev', 'motor', 
+             'car', 'battery', 'autonomous', 'tesla')
+
+get_nyt_articles <- function(keyword, begin_date, end_date) {
+  articles <- articlesearch(q = keyword,
+                          begin_date = begin_date,
+                          end_date = end_date,
+                          fl = c("headline", "pub_date", "snippet", 
+                                "web_url", "section_name"))
+  return(articles$data)
+}
+```
+```{r}
+start_date <- "2012-01-01"
+end_date <- format(Sys.Date(), "%Y-%m-%d")
+
+nyt_data <- map_df(keywords, function(kw) {
+  articles <- get_nyt_articles(kw, start_date, end_date)
+  articles$keyword <- kw
+  return(articles)
+})
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
