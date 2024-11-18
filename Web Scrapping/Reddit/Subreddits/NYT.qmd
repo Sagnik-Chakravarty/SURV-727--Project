@@ -1,69 +1,51 @@
 ```{r}
-library(rtimes)
+library(httr)
 library(jsonlite)
-library(tidyverse)
-library(tidytext)
-library(lubridate)
-library(wordcloud)
-library(textdata)
-library(scales)
-```
-```{r}
-Sys.setenv(NYTIMES_KEY = "WitNU2gMjn4URLzQTRgOxjVN0kWXZCAK")
-nyt <- rtimes::nyt_apikey()
+
+
+api_key <- "WitNU2gMjn4URLzQTRgOxjVN0kWXZCAK"
+
 
 keywords <- c('electric car', 'electric vehicle', 'ev', 'motor', 
-             'car', 'battery', 'autonomous', 'tesla')
+              'car', 'battery', 'autonomous', 'tesla')
 
-get_nyt_articles <- function(keyword, begin_date, end_date) {
-  articles <- articlesearch(q = keyword,
-                          begin_date = begin_date,
-                          end_date = end_date,
-                          fl = c("headline", "pub_date", "snippet", 
-                                "web_url", "section_name"))
-  return(articles$data)
+search_articles <- function(keyword, api_key) {
+  base_url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+  
+  query <- list(
+    q = keyword,
+    "api-key" = api_key
+  )
+  
+  response <- GET(base_url, query = query)
+  
+  if (status_code(response) == 200) {
+    content <- fromJSON(content(response, "text"), flatten = TRUE)
+    return(content$response$docs)
+  } else {
+    warning(paste("Error for keyword:", keyword, "- Status code:", status_code(response)))
+    return(NULL)
+  }
 }
-```
-```{r}
-start_date <- "2012-01-01"
-end_date <- format(Sys.Date(), "%Y-%m-%d")
 
-nyt_data <- map_df(keywords, function(kw) {
-  articles <- get_nyt_articles(kw, start_date, end_date)
-  articles$keyword <- kw
-  return(articles)
-})
-```
-```{r}
+results <- list()
 
-```
-```{r}
+for (keyword in keywords) {
+  articles <- search_articles(keyword, api_key)
+  if (!is.null(articles)) {
+    results[[keyword]] <- articles
+  }
+  Sys.sleep(6)
+}
 
-```
-```{r}
 
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
-```
-```{r}
-
+for (keyword in names(results)) {
+  cat("\nKeyword:", keyword, "\n")
+  cat("Number of articles found:", nrow(results[[keyword]]), "\n")
+  
+  if (nrow(results[[keyword]]) > 0) {
+    cat("First article headline:", results[[keyword]]$headline.main[1], "\n")
+    cat("First article snippet:", results[[keyword]]$snippet[1], "\n")
+  }
+}
 ```
