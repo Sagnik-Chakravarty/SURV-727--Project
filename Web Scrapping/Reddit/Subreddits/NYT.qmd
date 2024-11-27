@@ -72,4 +72,18 @@ head(all_articles)
 ```
 
 ```{r}
+library(ggplot2)
+
+article_counts <- all_articles %>%
+  group_by(keyword) %>%
+  summarise(article_count = n())
+
+ggplot(article_counts, aes(x = reorder(keyword, -article_count), y = article_count, fill = keyword)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Number of Articles by Keyword",
+       x = "Keyword",
+       y = "Number of Articles") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 ```
