@@ -49,3 +49,27 @@ for (keyword in names(results)) {
   }
 }
 ```
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# Convert results to a data frame
+all_articles <- lapply(names(results), function(keyword) {
+  if (!is.null(results[[keyword]]) && nrow(results[[keyword]]) > 0) {
+    data.frame(
+      keyword = keyword,
+      headline = results[[keyword]]$headline.main,
+      snippet = results[[keyword]]$snippet,
+      word_count = results[[keyword]]$word_count,
+      pub_date = as.Date(results[[keyword]]$pub_date)
+    )
+  }
+}) %>% bind_rows()
+
+# Check the structure of the consolidated data
+head(all_articles)
+```
+
+```{r}
+```
