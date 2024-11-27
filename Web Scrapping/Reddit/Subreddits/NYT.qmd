@@ -123,3 +123,105 @@ wordcloud(words = headlines_text,
           colors = brewer.pal(8, "Dark2"))
 
 ```
+
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(wordcloud)
+library(lubridate)
+library(gridExtra)
+library(scales)
+library(sentimentr)
+
+# Convert results to dataframe
+articles_df <- map_df(names(results), function(kw) {
+  if (!is.null(results[[kw]])) {
+    data.frame(
+      keyword = kw,
+      headline = results[[kw]]$headline.main,
+      snippet = results[[kw]]$snippet,
+      pub_date = as.Date(results[[kw]]$pub_date),
+      section = results[[kw]]$section_name,
+      stringsAsFactors = FALSE
+    )
+  }
+})
+```
+```{r}
+# 1. Keyword Frequency Plot
+keyword_counts <- articles_df %>%
+  count(keyword) %>%
+  ggplot(aes(x = reorder(keyword, n), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Number of Articles by Keyword",
+       x = "Keyword",
+       y = "Number of Articles") +
+  theme_minimal()
+```
+```{r}
+# 2. Timeline Plot
+timeline_plot <- articles_df %>%
+  ggplot(aes(x = pub_date, fill = keyword)) +
+  geom_histogram(binwidth = 30, position = "stack") +
+  labs(title = "Distribution of Articles Over Time",
+       x = "Publication Date",
+       y = "Number of Articles") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+```{r}
+# 3. Word Cloud of Headlines
+headline_words <- articles_df %>%
+  unnest_tokens(word, headline) %>%
+  anti_join(stop_words) %>%
+  count(word, sort = TRUE)
+
+wordcloud(words = headline_words$word,
+          freq = headline_words$n,
+          max.words = 50,
+          random.order = FALSE,
+          colors = brewer.pal(8, "Dark2"))
+```
+```{r}
+# 4. Sentiment Analysis
+sentiment_scores <- articles_df %>%
+  mutate(sentiment = get_sentiment(snippet)) %>%
+  group_by(keyword) %>%
+  summarise(avg_sentiment = mean(sentiment, na.rm = TRUE))
+
+sentiment_plot <- ggplot(sentiment_scores, 
+                        aes(x = reorder(keyword, avg_sentiment), 
+                            y = avg_sentiment)) +
+  geom_bar(stat = "identity", 
+           aes(fill = avg_sentiment > 0)) +
+  coord_flip() +
+  labs(title = "Average Sentiment by Keyword",
+       x = "Keyword",
+       y = "Average Sentiment Score") +
+  theme_minimal() +
+  scale_fill_manual(values = c("red", "green"))
+```
+```{r}
+# 5. Section Distribution
+section_plot <- articles_df %>%
+  count(section, sort = TRUE) %>%
+  na.omit() %>%
+  ggplot(aes(x = reorder(section, n), y = n)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Distribution of Articles by Section",
+       x = "Section",
+       y = "Number of Articles") +
+  theme_minimal()
+
+# Arrange plots in a grid
+grid.arrange(
+  keyword_counts, 
+  timeline_plot, 
+  sentiment_plot, 
+  section_plot,
+  ncol = 2
+)
+```
