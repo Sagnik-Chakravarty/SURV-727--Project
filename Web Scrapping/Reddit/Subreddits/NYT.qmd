@@ -85,5 +85,41 @@ ggplot(article_counts, aes(x = reorder(keyword, -article_count), y = article_cou
        y = "Number of Articles") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+ggplot(all_articles, aes(x = pub_date, y = keyword, color = keyword)) +
+  geom_point() +
+  labs(title = "Publication Timeline by Keyword",
+       x = "Publication Date",
+       y = "Keyword") +
+  theme_minimal()
+
+```
+
+```{r}
+ggplot(all_articles, aes(x = keyword, y = word_count, fill = keyword)) +
+  geom_boxplot(show.legend = FALSE) +
+  labs(title = "Word Count Distribution by Keyword",
+       x = "Keyword",
+       y = "Word Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+library(wordcloud)
+library(tm)
+
+# Combine all headlines into a single text
+headlines_text <- paste(all_articles$headline, collapse = " ")
+
+# Create a word cloud
+wordcloud(words = headlines_text,
+          scale = c(3, 0.5),
+          max.words = 100,
+          random.order = FALSE,
+          colors = brewer.pal(8, "Dark2"))
 
 ```
