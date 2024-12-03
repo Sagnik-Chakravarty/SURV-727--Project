@@ -169,7 +169,6 @@ timeline_plot <- articles_df %>%
        x = "Publication Date",
        y = "Number of Articles") +
   theme_minimal() +
-  theme(legend.position = "bottom")
 ```
 ```{r}
 # 3. Word Cloud of Headlines
