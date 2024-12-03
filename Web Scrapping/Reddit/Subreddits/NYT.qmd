@@ -1,52 +1,75 @@
 ```{r}
 library(httr)
 library(jsonlite)
+library(dplyr)
 
-
+# API key
 api_key <- "WitNU2gMjn4URLzQTRgOxjVN0kWXZCAK"
 
-
+# Keywords
 keywords <- c('electric car', 'electric vehicle', 'ev', 'motor', 
               'car', 'battery', 'autonomous', 'tesla')
 
+# Modified search function with error handling
 search_articles <- function(keyword, api_key) {
   base_url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
   
   query <- list(
     q = keyword,
-    "api-key" = api_key
+    "api-key" = api_key,
+    sort = "relevance"
   )
   
-  response <- GET(base_url, query = query)
-  
-  if (status_code(response) == 200) {
-    content <- fromJSON(content(response, "text"), flatten = TRUE)
-    return(content$response$docs)
-  } else {
-    warning(paste("Error for keyword:", keyword, "- Status code:", status_code(response)))
+  # Add error handling for the API request
+  tryCatch({
+    response <- GET(base_url, query = query)
+    
+    if (status_code(response) == 200) {
+      # Fix for content parsing
+      raw_content <- rawToChar(response$content)
+      parsed_content <- fromJSON(raw_content, flatten = TRUE)
+      return(parsed_content$response$docs)
+    } else {
+      warning(paste("Error for keyword:", keyword, "- Status code:", status_code(response)))
+      return(NULL)
+    }
+  }, error = function(e) {
+    warning(paste("Error processing keyword:", keyword, "-", e$message))
     return(NULL)
-  }
+  })
 }
 
+# Initialize results list
 results <- list()
 
+# Collect articles with progress indicator
+cat("Collecting articles...\n")
 for (keyword in keywords) {
+  cat(paste("Searching for:", keyword, "\n"))
   articles <- search_articles(keyword, api_key)
-  if (!is.null(articles)) {
+  if (!is.null(articles) && length(articles) > 0) {
     results[[keyword]] <- articles
   }
-  Sys.sleep(6)
+  Sys.sleep(6) # Rate limiting
 }
 
-
+# Process and display results
 for (keyword in names(results)) {
-  cat("\nKeyword:", keyword, "\n")
-  cat("Number of articles found:", nrow(results[[keyword]]), "\n")
-  
-  if (nrow(results[[keyword]]) > 0) {
-    cat("First article headline:", results[[keyword]]$headline.main[1], "\n")
-    cat("First article snippet:", results[[keyword]]$snippet[1], "\n")
-  }
+  tryCatch({
+    cat("\n-------------------\n")
+    cat("Keyword:", keyword, "\n")
+    
+    if (length(results[[keyword]]) > 0) {
+      cat("Number of articles found:", length(results[[keyword]]), "\n")
+      cat("First article headline:", results[[keyword]]$headline.main[1], "\n")
+      cat("First article snippet:", results[[keyword]]$snippet[1], "\n")
+      cat("Publication date:", results[[keyword]]$pub_date[1], "\n")
+    } else {
+      cat("No articles found\n")
+    }
+  }, error = function(e) {
+    cat("Error processing results for keyword:", keyword, "\n")
+  })
 }
 ```
 
