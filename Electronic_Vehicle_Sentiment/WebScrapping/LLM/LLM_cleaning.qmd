@@ -1,0 +1,43 @@
+---
+title: "LLM Cleaning"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(stringr)
+library(quanteda)
+library(kableExtra)
+library(readr)
+```
+
+```{r}
+LLM_model <- read_csv("~/Desktop/UMD_College_Work/Project/Electronic_Vehicle_Sentiment/WebScrapping/LLM/filtered_LLM_model.csv")
+```
+
+```{r}
+answer_clean <- function(x){
+  tk <- tibble(line = 1, text = x)
+  tk <- tk %>% 
+    unnest_tokens(word, text) %>% 
+    anti_join(stop_words)
+  return(tolower(str_c(tk$word, collapse = ' ')))
+}
+```
+
+```{r}
+filtered_LLM_model_clean <- LLM_model %>%
+  rowwise() %>%
+  mutate(cleaned_answer = answer_clean(Answer)) %>%
+  select(-Answer) %>%
+  ungroup()
+```
+
+```{r}
+write.csv(filtered_LLM_model_clean, "cleaned_llm.csv")
+```

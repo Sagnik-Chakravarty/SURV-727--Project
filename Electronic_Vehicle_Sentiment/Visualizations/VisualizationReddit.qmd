@@ -1,0 +1,285 @@
+---
+title: "Visualization"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+reddit_sentiment <- read_csv("~/Desktop/UMD_College_Work/Project/Electronic_Vehicle_Sentiment/WorkableData/Reddit/reddit_sentiment.csv")
+```
+
+# Post Data Visualization
+
+```{r}
+library(dplyr)
+library(UpSetR)
+
+post_data <- reddit_sentiment %>% select(matched_keyword, subreddit)
+post_data$matched_keyword <- as.character(post_data$matched_keyword)
+sets <- strsplit(post_data$matched_keyword, ",")
+keywords <- unique(unlist(sets))
+set_matrix <- data.frame(matrix(0, nrow = length(post_data$matched_keyword), ncol = length(keywords)))
+colnames(set_matrix) <- keywords
+
+for (i in seq_along(sets)) {
+  set_matrix[i, match(trimws(sets[[i]]), keywords)] <- 1
+}
+```
+
+```{r fig.width= 15}
+upset(set_matrix, 
+      nsets = 14,                # Display all 14 sets
+      order.by = "freq",         # Order by frequency of intersections,        # Order by increasing frequency
+      main.bar.color = "black",   # Main bar color
+      sets.bar.color = "red",    # Set bar color
+      matrix.color = "black",     # Matrix color
+      set_size.show = TRUE,
+      mainbar.y.label = "Intersection Size",  # Label for the intersection bar chart
+      sets.x.label = "Set Size",
+      text.scale = 0.8
+      ) 
+```
+
+```{r fig.width= 15}
+library(dplyr)
+library(tidyr)
+library(UpSetR)
+
+# Function to create and print UpSetR plots for each subreddit
+upset_sub_print <- function(data) {
+  subreddits <- unique(data$subreddit)  # Get unique subreddits
+
+  # Iterate over each subreddit
+  for (i in 1:length(subreddits)) {
+    # Filter data for the current subreddit
+    p_data <- data %>% filter(subreddit == subreddits[i])  
+    sets <- strsplit(p_data$matched_keyword, ",")  # Split matched keywords by comma
+    keywords <- unique(unlist(sets))  # Get unique keywords
+
+    # Create a binary matrix for the set intersections
+    set_matrix <- data.frame(matrix(0, nrow = nrow(p_data), ncol = length(keywords)))
+    colnames(set_matrix) <- keywords
+
+    # Fill in the matrix with 1s where keywords are present
+    for (j in seq_along(sets)) {
+      set_matrix[j, match(trimws(sets[[j]]), keywords)] <- 1
+    }
+
+    # Print message to confirm which subreddit is being processed
+    print(paste("Generating plot for subreddit:", subreddits[i]))
+    
+    # Generate the UpSet plot for the current subreddit
+    a <- upset(set_matrix,
+          nsets = length(keywords),  # Display all sets
+          order.by = "freq",  # Order by frequency of intersections
+          main.bar.color = "black",  # Main bar color
+          sets.bar.color = "red",  # Set bar color
+          matrix.color = "black",  # Matrix color
+          set_size.show = TRUE,
+          mainbar.y.label = "Intersection Size",  # Label for the intersection bar chart
+          sets.x.label = "Set Size",
+          text.scale = 1)
+    print(a)
+  }
+}
+
+# Example usage:
+# Assuming 'reddit_sentiment' is your data frame
+upset_sub_print(reddit_sentiment)
+```
+
+```{r fig.height=8}
+library(dplyr)
+library(ggplot2)
+
+total_posts_barplot <- function(data) {
+  post_count <- data %>%
+    group_by(subreddit) %>%
+    summarise(total_posts = n())
+  ggplot(post_count, aes(x = reorder(subreddit, -total_posts), y = total_posts)) +
+    geom_bar(stat = "identity", fill = "steelblue") + 
+    geom_text(aes(label = total_posts), vjust = -0.3, color = "black") +
+    labs(title = "Total Number of Posts per Subreddit", 
+         x = "Subreddit", 
+         y = "Total Posts") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+}
+
+total_posts_barplot(reddit_sentiment)
+
+```
+
+```{r}
+comment_data <- reddit_sentiment %>% select(subreddit, comments)
+
+total_comment <- comment_data %>% group_by(subreddit) %>% summarize(sum(comments))
+
+total_comment %>% ggplot(aes(x= reorder(subreddit, -`sum(comments)`), y = `sum(comments)`))+
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Comment Per Subreddit',
+       x = 'Subreddit',
+       y = 'Total Comment')+
+  theme_minimal()
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+# Convert date_utc to Date format
+reddit_sentiment$date_utc <- as.Date(reddit_sentiment$date_utc)
+
+# Extract year and month, then count the number of posts per month
+posts_per_month <- reddit_sentiment %>%
+  mutate(month = floor_date(date_utc, "month")) %>%
+  group_by(month) %>%
+  summarise(number_of_posts = n())
+
+# Create the line chart
+ggplot(posts_per_month, aes(x = month, y = number_of_posts)) +
+  geom_line(color = "black") +
+  geom_point(color = "red") +
+  labs(title = "Number of Posts by Month", x = "Month", y = "Number of Posts") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+# Sentiment Analysis Visualization
+
+```{r fig.width= 10}
+total_sentiment_post <- reddit_sentiment %>% group_by(overall_sentiment_post) %>% summarize(frequency = n())
+
+total_sentiment_comment <- reddit_sentiment %>% group_by(sentiment_comment_final) %>% summarize(frequency = n())
+
+total_sentiment <- reddit_sentiment %>% group_by(overall_sentiment) %>% summarize(frequency = n())
+
+sentiment_post_plot <- total_sentiment_post %>% ggplot(aes(x = overall_sentiment_post, y = frequency)) +
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Post Sentiment',
+       x = 'Sentiment',
+       y = 'Frequency')+
+  theme_minimal()
+
+sentiment_comment_plot <- total_sentiment_comment %>% ggplot(aes(x = sentiment_comment_final, y = frequency))+
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Comment Sentiment',
+       x = 'Sentiment',
+       y = 'Frequency')+
+  theme_minimal()
+
+sentiment_plot <- total_sentiment %>% ggplot(aes(x = overall_sentiment, y = frequency))+
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Overall Sentiment',
+       x = 'Sentiment',
+       y = 'Frequency')+
+  theme_minimal()
+
+library(patchwork)
+(sentiment_post_plot | sentiment_comment_plot | sentiment_plot)
+```
+
+```{r fig.width=10}
+comment_post_positive <- reddit_sentiment %>%
+  select(overall_sentiment_post, sentiment_comment_final) %>%
+  filter(overall_sentiment_post == 'POSITIVE') %>%
+  group_by(sentiment_comment_final) %>%
+  summarise(comment_post_positive = n())
+
+comment_post_Negative <- reddit_sentiment %>%
+  select(overall_sentiment_post, sentiment_comment_final) %>%
+  filter(overall_sentiment_post == 'NEGATIVE') %>%
+  group_by(sentiment_comment_final) %>%
+  summarise(comment_post_Negative = n())
+
+post_negative_plot <- comment_post_Negative %>%  ggplot(aes(x = sentiment_comment_final, y = comment_post_Negative))+
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Sentiment of Comment when Post is Negative',
+       x = 'Sentiment',
+       y = 'Frequency')+
+  theme_minimal()
+
+post_positive_plot <- comment_post_positive %>%  ggplot(aes(x = sentiment_comment_final, y = comment_post_positive))+
+  geom_bar(stat = 'identity', fill = 'steelblue')+
+  labs(title = 'Sentiment of Comment when Post is Positive',
+       x = 'Sentiment',
+       y = 'Frequency')+
+  theme_minimal()
+
+(post_negative_plot | post_positive_plot)
+```
+
+```{r fig.width= 10}
+library(tidyquant)
+quarterly_sentiment_counts <- reddit_sentiment %>%
+  mutate(quarter = floor_date(date_utc, "quarter")) %>%
+  group_by(quarter, overall_sentiment_post) %>%
+  summarise(count = n()) %>%
+  spread(key = overall_sentiment_post, value = count, fill = 0)
+
+# Create a candlestick chart
+ggplot(quarterly_sentiment_counts, aes(x = quarter)) +
+  geom_linerange(aes(ymin = pmin(POSITIVE, NEGATIVE), ymax = pmax(POSITIVE, NEGATIVE)), color = "black", size = 0.5) +
+  geom_segment(aes(y = NEGATIVE, yend = POSITIVE, xend = quarter), 
+               color = ifelse(quarterly_sentiment_counts$POSITIVE >= quarterly_sentiment_counts$NEGATIVE, "green", "red"), 
+               size = 3) +
+  labs(title = "Quarterly Sentiment Candlestick Chart", x = "Quarter", y = "Number of Posts") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r }
+positive_matched <- reddit_sentiment %>% select(matched_keyword, overall_sentiment) %>% filter(overall_sentiment == "POSITIVE")
+
+positive_matched$matched_keyword <- as.character(positive_matched$matched_keyword)
+sets <- strsplit(positive_matched$matched_keyword, ",")
+keywords <- unique(unlist(sets))
+set_matrix <- data.frame(matrix(0, nrow = length(positive_matched$matched_keyword), ncol = length(keywords)))
+colnames(set_matrix) <- keywords
+
+for (i in seq_along(sets)) {
+  set_matrix[i, match(trimws(sets[[i]]), keywords)] <- 1
+}
+
+upset(set_matrix, 
+      nsets = 14,                # Display all 14 sets
+      order.by = "freq",         # Order by frequency of intersections,        # Order by increasing frequency
+      main.bar.color = "black",   # Main bar color
+      sets.bar.color = "red",    # Set bar color
+      matrix.color = "black",     # Matrix color
+      set_size.show = TRUE,
+      mainbar.y.label = "Intersection Size",  # Label for the intersection bar chart
+      sets.x.label = "Set Size",
+      text.scale = 0.4
+      ) 
+```
+
+```{r}
+negative_matched <- reddit_sentiment %>% select(matched_keyword, overall_sentiment) %>% filter(overall_sentiment == "NEGATIVE")
+
+negative_matched$matched_keyword <- as.character(negative_matched$matched_keyword)
+sets <- strsplit(negative_matched$matched_keyword, ",")
+keywords <- unique(unlist(sets))
+set_matrix <- data.frame(matrix(0, nrow = length(negative_matched$matched_keyword), ncol = length(keywords)))
+colnames(set_matrix) <- keywords
+
+for (i in seq_along(sets)) {
+  set_matrix[i, match(trimws(sets[[i]]), keywords)] <- 1
+}
+
+upset(set_matrix, 
+      nsets = 14,                # Display all 14 sets
+      order.by = "freq",         # Order by frequency of intersections,        # Order by increasing frequency
+      main.bar.color = "black",   # Main bar color
+      sets.bar.color = "red",    # Set bar color
+      matrix.color = "black",     # Matrix color
+      set_size.show = TRUE,
+      mainbar.y.label = "Intersection Size",  # Label for the intersection bar chart
+      sets.x.label = "Set Size",
+      text.scale = 0.4
+      )
+```
