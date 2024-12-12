@@ -1,0 +1,177 @@
+```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+
+# API key
+api_key <- "WitNU2gMjn4URLzQTRgOxjVN0kWXZCAK"
+
+# Keywords
+keywords <- c('electric car', 'electric vehicle', 'ev', 'motor', 
+              'car', 'battery', 'autonomous', 'tesla')
+
+# Modified search function with error handling
+search_articles <- function(keyword, api_key) {
+  base_url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+  
+  query <- list(
+    q = keyword,
+    "api-key" = api_key,
+    sort = "relevance"
+  )
+  
+  # Add error handling for the API request
+  tryCatch({
+    response <- GET(base_url, query = query)
+    
+    if (status_code(response) == 200) {
+      # Fix for content parsing
+      raw_content <- rawToChar(response$content)
+      parsed_content <- fromJSON(raw_content, flatten = TRUE)
+      return(parsed_content$response$docs)
+    } else {
+      warning(paste("Error for keyword:", keyword, "- Status code:", status_code(response)))
+      return(NULL)
+    }
+  }, error = function(e) {
+    warning(paste("Error processing keyword:", keyword, "-", e$message))
+    return(NULL)
+  })
+}
+
+# Initialize results list
+results <- list()
+
+# Collect articles with progress indicator
+cat("Collecting articles...\n")
+for (keyword in keywords) {
+  cat(paste("Searching for:", keyword, "\n"))
+  articles <- search_articles(keyword, api_key)
+  if (!is.null(articles) && length(articles) > 0) {
+    results[[keyword]] <- articles
+  }
+  Sys.sleep(6) # Rate limiting
+}
+
+# Process and display results
+for (keyword in names(results)) {
+  tryCatch({
+    cat("\n-------------------\n")
+    cat("Keyword:", keyword, "\n")
+    
+    if (length(results[[keyword]]) > 0) {
+      cat("Number of articles found:", length(results[[keyword]]), "\n")
+      cat("First article headline:", results[[keyword]]$headline.main[1], "\n")
+      cat("First article snippet:", results[[keyword]]$snippet[1], "\n")
+      cat("Publication date:", results[[keyword]]$pub_date[1], "\n")
+    } else {
+      cat("No articles found\n")
+    }
+  }, error = function(e) {
+    cat("Error processing results for keyword:", keyword, "\n")
+  })
+}
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# Convert results to a data frame
+all_articles <- lapply(names(results), function(keyword) {
+  if (!is.null(results[[keyword]]) && nrow(results[[keyword]]) > 0) {
+    data.frame(
+      keyword = keyword,
+      headline = results[[keyword]]$headline.main,
+      snippet = results[[keyword]]$snippet,
+      word_count = results[[keyword]]$word_count,
+      pub_date = as.Date(results[[keyword]]$pub_date)
+    )
+  }
+}) %>% bind_rows()
+
+# Check the structure of the consolidated data
+head(all_articles)
+```
+
+```{r}
+library(reticulate)
+library(huggingfaceR)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+
+# Initialize Hugging Face models
+distilBERT <- hf_load_pipeline(
+  model_id = "distilbert-base-uncased-finetuned-sst-2-english", 
+  task = "text-classification"
+)
+
+# Apply sentiment analysis to all articles
+sentiment_df <- all_articles %>%
+  rowwise() %>%
+  mutate(
+    headline_sentiment = list(distilBERT(headline)[[1]]),
+    snippet_sentiment = list(distilBERT(snippet)[[1]])
+  ) %>%
+  ungroup() %>%
+  mutate(
+    headline_label = map_chr(headline_sentiment, ~.x$label),
+    headline_score = map_dbl(headline_sentiment, ~.x$score),
+    snippet_label = map_chr(snippet_sentiment, ~.x$label),
+    snippet_score = map_dbl(snippet_sentiment, ~.x$score)
+  )
+
+# Create visualizations
+# 1. Sentiment distribution by keyword
+p1 <- sentiment_df %>%
+  ggplot(aes(x = keyword, fill = headline_label)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  labs(title = "Headline Sentiment by Keyword",
+       y = "Proportion",
+       x = "Keyword") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+
+# 2. Sentiment trends over time
+p2 <- sentiment_df %>%
+  ggplot(aes(x = pub_date, y = headline_score, color = keyword)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(title = "Sentiment Scores Over Time",
+       x = "Publication Date",
+       y = "Sentiment Score") +
+  theme_minimal()
+
+# 3. Headline vs Snippet sentiment comparison
+p3 <- sentiment_df %>%
+  ggplot(aes(x = headline_score, y = snippet_score, color = keyword)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Headline vs Snippet Sentiment",
+       x = "Headline Sentiment Score",
+       y = "Snippet Sentiment Score") +
+  theme_minimal()
+
+# 4. Average sentiment by keyword
+p4 <- sentiment_df %>%
+  group_by(keyword) %>%
+  summarise(
+    avg_headline_score = mean(headline_score),
+    avg_snippet_score = mean(snippet_score)
+  ) %>%
+  pivot_longer(cols = starts_with("avg_"),
+               names_to = "type",
+               values_to = "score") %>%
+  ggplot(aes(x = keyword, y = score, fill = type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  labs(title = "Average Sentiment Scores by Keyword",
+       x = "Keyword",
+       y = "Average Score") +
+  theme_minimal()
+
+# Arrange plots in a grid
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
