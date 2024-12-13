@@ -95,11 +95,7 @@ head(all_articles)
 ```
 
 ```{r}
-library(reticulate)
-library(huggingfaceR)
-library(tidyverse)
-library(ggplot2)
-library(gridExtra)
+ ()
 
 # Initialize Hugging Face models
 distilBERT <- hf_load_pipeline(

@@ -1,0 +1,27 @@
+```{r}
+library(tidyverse)
+library(stats)
+library(effectsize)
+
+# Combine sentiment data from all sources
+sentiment_scores <- data.frame(
+  Platform = c(rep("NYT", 222), rep("Reddit", 150), rep("Groq", 180)),
+  Score = c(
+    sentiment_df$headline_score,  # NYT scores
+    reddit_sentiment$score,       # Reddit scores
+    llm_sentiment$score          # Groq LLM scores
+  )
+)
+
+# Perform one-way ANOVA
+anova_result <- aov(Score ~ Platform, data = sentiment_scores)
+summary(anova_result)
+
+# Post-hoc Tukey test
+tukey_result <- TukeyHSD(anova_result)
+print(tukey_result)
+
+# Effect size calculation
+eta_squared <- eta_squared(anova_result)
+print(eta_squared)
+```
