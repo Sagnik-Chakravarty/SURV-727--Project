@@ -1,0 +1,235 @@
+---
+title: "Reddit&Groq Visualization"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+```
+
+## LLM
+
+```{r warning=FALSE, message=FALSE}
+sentimentLLM <- read_csv("~/Desktop/UMD_College_Work/Project/Electronic_Vehicle_Sentiment/WebScrapping/LLM/sentimentLLM.csv")
+sentimentLLM <- na.omit(sentimentLLM)
+```
+
+```{r}
+sentiment_frequency <- sentimentLLM %>%
+  group_by(Model, sentiment_title) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+
+model_sentiment <- ggplot(sentiment_frequency, 
+                          aes(x = Model, 
+                              y = Frequency, 
+                              fill = sentiment_title)) +
+  geom_bar(stat = 'identity', 
+           position = 'dodge') +
+  geom_text(aes(label = Frequency), 
+            vjust = -0.3, 
+            position = position_dodge(0.9), 
+            size = 3) +
+  labs(title = 'Sentiment Frequency for Each Model', 
+       x = 'Model', 
+       y = 'Frequency') +
+  theme(axis.text.x = element_text(angle = 45, 
+                                   hjust = 1)) +
+  scale_fill_manual(values = c("NEGATIVE" = "blue", 
+                               "POSITIVE" = "orange", 
+                               "nan" = "green"))
+
+model_sentiment
+```
+
+```{r}
+persona_frequency <- sentimentLLM %>%
+  group_by(Persona, sentiment_title) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+persona_frequency_plot <- ggplot(persona_frequency, 
+                                 aes(x = Persona, 
+                                     y = Frequency, 
+                                     fill = sentiment_title)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(label = Frequency), 
+            position = position_stack(vjust = 0.5), 
+            size = 3) +
+  labs(title = 'Sentiment Frequency for Each Persona', 
+       x = 'Persona', y = 'Frequency') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("NEGATIVE" = "blue", "POSITIVE" = "orange"))
+
+persona_frequency_plot
+```
+
+```{r}
+# Filter out rows where sentiment_title is NA
+data <- sentimentLLM
+data_filtered <- data %>%
+  filter(!is.na(sentiment_title))
+
+# Calculate sentiment frequency for each model and persona
+sentiment_counts <- data_filtered %>%
+  group_by(Model, sentiment_title, Persona) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+# Plotting the horizontal side-by-side stacked bar chart
+combined_graph <- ggplot(sentiment_counts, aes(x = Frequency, y = Model, fill = Persona)) +
+  geom_bar(stat = 'identity', position = 'stack') +
+  facet_wrap(~ sentiment_title, ncol = 1) +
+  geom_text(aes(label = Frequency), position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = 'Sentiment Frequency by Model and Persona', x = 'Frequency', y = 'Model') +
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+```
+
+```{r}
+combined_graph
+```
+
+```{r}
+# Filter out rows where sentiment_title is NA
+data_filtered <- data %>%
+  filter(!is.na(sentiment_title))
+
+# Create shorter labels for each unique question
+data_filtered <- data_filtered %>%
+  mutate(Question_Label = as.factor(as.numeric(factor(Question))))
+
+# Calculate sentiment frequency for each question
+sentiment_by_question <- data_filtered %>%
+  group_by(Question_Label, sentiment_title) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+# Plotting the bar chart
+ggplot(sentiment_by_question, aes(x = Frequency, y = Question_Label, fill = sentiment_title)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = Frequency), position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
+  labs(title = 'Sentiment Frequency for Each Question', x = 'Frequency', y = 'Question') +
+  theme_minimal() +
+  scale_fill_manual(values = c("NEGATIVE" = "blue", "POSITIVE" = "orange")) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+
+ question_mapping <- setNames(as.numeric(factor(unique(data_filtered$Question))), unique(data_filtered$Question))
+question_mapping
+```
+
+```{r}
+# Filter out rows where sentiment_title is NA
+data_filtered <- data %>%
+  filter(!is.na(sentiment_title))
+
+# Create shorter labels for each unique question
+data_filtered <- data_filtered %>%
+  mutate(Question_Label = paste0('Q', as.numeric(factor(Question))))
+
+# Calculate sentiment frequency by question and model
+sentiment_counts <- data_filtered %>%
+  group_by(Question_Label, Model, sentiment_title) %>%
+  summarise(Frequency = n()) %>%
+  ungroup()
+
+# Plotting the bar chart
+ggplot(sentiment_counts, aes(x = Frequency, y = Model, fill = sentiment_title)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  facet_wrap(~ Question_Label) +
+  geom_text(aes(label = Frequency), position = position_dodge(width = 0.9), hjust = -0.1, size = 3) +
+  labs(title = 'Sentiment Frequency by Question and Model', x = 'Frequency', y = 'Model') +
+  theme_minimal() +
+  scale_fill_manual(values = c("NEGATIVE" = "blue", "POSITIVE" = "orange")) +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+library(dplyr)
+library(tidytext)
+library(wordcloud)
+
+# Unnest tokens to get individual words from the cleaned_answer column
+words <- data %>%
+  unnest_tokens(word, cleaned_answer) %>%
+  anti_join(stop_words) %>%
+  count(word, sort = TRUE)
+
+# Create a word cloud
+set.seed(1234)
+wordcloud(words = words$word, freq = words$n, min.freq = 2,
+          max.words = 100, random.order = FALSE, rot.per = 0.35,
+          colors = brewer.pal(8, "Dark2"))
+```
+
+## Reddit
+
+```{r}
+fuckcars$subreddit <- "fuckcars"
+teslamodel3$subreddit <- "teslamodel3"
+teslamotors$subreddit <- "teslamotors"
+rivian_final$subreddit <- "rivian"
+electric_vehicles$subreddit <- "electricvehicles"
+reddit_sentiment_df <- rbind(fuckcars, teslamodel3, teslamotors, rivian_final, electric_vehicles)
+```
+
+```{r}
+write_csv(reddit_sentiment_df, "reddit_sentiment.csv")
+```
+
+```{r}
+data <- reddit_sentiment_df
+ggplot(data, aes(x = subreddit, fill = overall_sentiment_post)) + 
+  geom_bar(position = "dodge") + 
+  ggtitle("Sentiment by Subreddit") + 
+  xlab("Subreddit") + ylab("Count")
+```
+
+```{r}
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(readr)
+# Filter and prepare data
+data_filtered <- data %>%
+  filter(overall_sentiment_post %in% c("POSITIVE", "NEGATIVE")) %>%
+  separate_rows(matched_keyword, sep = ",") %>%
+  count(subreddit, matched_keyword, overall_sentiment_post) %>%
+  pivot_wider(names_from = overall_sentiment_post, values_from = n, values_fill = 0)
+
+# Create stacked bar plot
+ggplot(data_filtered, aes(x = subreddit)) +
+  geom_bar(aes(y = POSITIVE, fill = matched_keyword), stat = "identity", position = "stack") +
+  geom_bar(aes(y = -NEGATIVE, fill = matched_keyword), stat = "identity", position = "stack") +
+  coord_flip() +
+  labs(title = "Sentiment by Keywords and Subreddit",
+       x = "Subreddit",
+       y = "Frequency",
+       fill = "Keyword") +
+  theme_minimal()
+```
+
+```{r}
+keywords <- c("Battery Electric Vehicle", "Plug in Hybrid Electric Vehicle", "Hybrid Electric Vehicle", "gas", "sustainability", "sustainable", "environment")
+
+# Filter data for relevant keywords
+data_filtered <- data %>%
+  filter(grepl(paste(keywords, collapse = "|"), matched_keyword, ignore.case = TRUE))
+
+# Count positive and negative sentiments for the filtered posts
+sentiment_summary <- data_filtered %>%
+  separate_rows(matched_keyword, sep = ",") %>%
+  filter(matched_keyword %in% keywords) %>%
+  group_by(matched_keyword, overall_sentiment_post) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = overall_sentiment_post, values_from = count, values_fill = list(count = 0))
+
+print(sentiment_summary)
+```

@@ -1,0 +1,4 @@
+"Platform","Mean.Sentiment.Score..M.","Standard.Deviation..SD.","Significant.Difference..p.value.","Interpretation"
+"NYT",-0.23,0.45,"p < .001 (vs Groq)","Predominantly negative sentiment, especially for ""Electric vehicles"" and ""Electric Cars""; positive response to ""Tesla"" and ""autonomous"" technology"
+"Reddit",-0.18,0.52,"p < .001 (vs Groq)","Negative sentiment with higher variability, indicating polarized opinions"
+"Groq LLM",0.34,0.38,"p < .001 (vs NYT and Reddit)","Significantly more positive sentiment, focusing on environmental benefits and sustainability"

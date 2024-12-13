@@ -1,0 +1,74 @@
+---
+title: "SubredditOverallSentimentCalculations"
+author: "Sagnik Chakravarty and Namit Shrivastava"
+format: html
+editor: visual
+---
+
+```{r}
+library('readr')
+library('dplyr')
+
+comment_manipulation_df <- function(df){
+  df_final <- df %>% group_by(post_url) %>%
+  summarise(post_upvote_score = sum(post_upvote_score),
+            comment_upvote_score_final = sum(ifelse(is.na(comment_upvote_score), 0, comment_upvote_score)),
+            sentiment_comment_final = case_when(
+              sum(sentiment_comment == 'POSITIVE') > sum(sentiment_comment == "NEGATIVE") ~ 'POSITIVE',
+              sum(sentiment_comment == 'POSITIVE') < sum(sentiment_comment == "NEGATIVE") ~ 'NEGATIVE',
+              TRUE ~ ifelse(
+                mean(sentiment_comment_score[sentiment_comment == "POSITIVE"], na.rm = TRUE) > mean(sentiment_comment_score[sentiment_comment == "NEGATIVE"], na.rm = TRUE),
+                "POSITIVE",
+                "NEGATIVE"
+              )),
+              sentiment_comment_score_final = sum(if_else(sentiment_comment == "POSITIVE",
+                                                sentiment_comment_score*comment_upvote_score,
+                                                -1*sentiment_comment_score*comment_upvote_score), na.rm = TRUE)
+            ) %>%
+              ungroup()
+            
+  return(df_final)
+}
+```
+
+```{r}
+sentimental_df_final <- function(sentiment_df, comment_df) {
+  sentiment_df %>%
+    rename(post_url = url) %>%
+    full_join(comment_df, by = "post_url") %>%
+    select(-cleaned_text, -cleaned_title) %>%
+    mutate(
+      sentiment_score = if_else(
+        !is.na(comments) & comments != 0, 
+        if_else(
+          (post_upvote_score + comment_upvote_score_final) == 0, 
+          overall_sentiment_score_post,  
+          (overall_sentiment_score_post * post_upvote_score + sentiment_comment_score_final) /
+            (post_upvote_score + comment_upvote_score_final) 
+        ),
+        overall_sentiment_score_post 
+      )
+    ) %>%
+    mutate(overall_sentiment = if_else(sentiment_score >= 0, 'POSITIVE', 'NEGATIVE'))
+}
+```
+
+```{r}
+sentiment_generator <- function(sentiment_link, comment_link, file_name){
+  df_sentiment <- read_csv(sentiment_link)
+  df_comment <- read_csv(comment_link)
+  df_comment_score <- comment_manipulation_df(df_comment)
+  df_final <- sentimental_df_final(df_sentiment, df_comment_score)
+  file_name <- paste0(file_name,"_final.csv")
+  write.csv(df_final, file_name, row.names = FALSE)
+  return(df_final)
+}
+```
+
+```{r}
+teslamotors_final <- sentiment_generator("teslamotors_sentiment.csv", "teslamotors_comment_sentiment.csv", "teslamotors")
+teslamodel3_final <- sentiment_generator("teslamodel3_sentiment.csv", "teslamodel3_comment_sentiment.csv", "teslamodel3")
+rivian <- sentiment_generator("rivian_sentiment.csv", "rivian_comment_sentiment.csv", "rivian")
+fuckcars <- sentiment_generator("fuckcars_sentiment.csv", "fuckcars_comment_sentiment.csv", "fuckcars")
+electric_vehicles <- sentiment_generator("electric_vehicles_sentiment.csv", "electric_vehicles_comment_sentiment.csv", "electric_vehicles")
+```
